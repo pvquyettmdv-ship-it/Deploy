@@ -48,6 +48,7 @@ fun SearchScreen(
 
     var activeTab by remember { mutableStateOf(0) } // 0: Bài viết, 1: Người dùng
     var showCommentDialogForPost by remember { mutableStateOf<Post?>(null) }
+    var activePostMenu by remember { mutableStateOf<Post?>(null) }
 
     // Search Filtering logic
     val filteredPosts = remember(posts, searchQuery) {
@@ -217,7 +218,7 @@ fun SearchScreen(
                                     copyToClipboard(context, "https://netvibe.social/post/${post.id}")
                                     Toast.makeText(context, "Đã sao chép liên kết chia sẻ!", Toast.LENGTH_SHORT).show()
                                 },
-                                onMoreClick = {},
+                                onMoreClick = { activePostMenu = post },
                                 onUserClick = { onNavigateToProfile(post.username) }
                             )
                         }
@@ -272,6 +273,34 @@ fun SearchScreen(
                 post = post,
                 viewModel = viewModel,
                 onDismiss = { showCommentDialogForPost = null }
+            )
+        }
+
+        // More Post Options Bottom Sheet / Dialog (Report, Block, Hide)
+        activePostMenu?.let { post ->
+            PostOptionsMenu(
+                post = post,
+                onDismiss = { activePostMenu = null },
+                onCopyText = {
+                    copyToClipboard(context, post.content)
+                    Toast.makeText(context, "Đã sao chép nội dung bài viết!", Toast.LENGTH_SHORT).show()
+                    activePostMenu = null
+                },
+                onHide = {
+                    viewModel.hidePost(post.id)
+                    Toast.makeText(context, "Đã ẩn bài viết khỏi bảng tin của bạn.", Toast.LENGTH_SHORT).show()
+                    activePostMenu = null
+                },
+                onBlockUser = {
+                    viewModel.blockUser(post.username)
+                    Toast.makeText(context, "Đã chặn người dùng ${post.username}.", Toast.LENGTH_LONG).show()
+                    activePostMenu = null
+                },
+                onReport = {
+                    viewModel.reportPost(post.id)
+                    Toast.makeText(context, "Đã gửi báo cáo vi phạm nội dung bài viết.", Toast.LENGTH_LONG).show()
+                    activePostMenu = null
+                }
             )
         }
     }

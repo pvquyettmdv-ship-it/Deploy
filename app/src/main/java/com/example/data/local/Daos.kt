@@ -11,6 +11,9 @@ interface UserDao {
     @Query("SELECT * FROM users WHERE username = :username LIMIT 1")
     suspend fun getUserByUsername(username: String): User?
 
+    @Query("SELECT * FROM users WHERE email = :email LIMIT 1")
+    suspend fun getUserByEmail(email: String): User?
+
     @Query("SELECT * FROM users WHERE username = :username LIMIT 1")
     fun observeUserByUsername(username: String): Flow<User?>
 
@@ -28,6 +31,12 @@ interface UserDao {
 
     @Update
     suspend fun updateUser(user: User)
+
+    @Query("UPDATE users SET isCurrentUser = 0")
+    suspend fun logoutAllUsers()
+
+    @Query("UPDATE users SET isCurrentUser = 1 WHERE username = :username")
+    suspend fun loginUser(username: String)
 }
 
 @Dao

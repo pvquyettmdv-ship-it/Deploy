@@ -12,7 +12,9 @@ data class User(
     val followersCount: Int,
     val followingCount: Int,
     val isFollowing: Boolean = false,
-    val isCurrentUser: Boolean = false
+    val isCurrentUser: Boolean = false,
+    val email: String? = null,
+    val password: String? = null
 )
 
 @Entity(tableName = "posts")

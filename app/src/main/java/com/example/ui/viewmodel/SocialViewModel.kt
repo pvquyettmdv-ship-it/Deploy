@@ -149,6 +149,33 @@ class SocialViewModel(application: Application) : AndroidViewModel(application) 
         }
     }
 
+    fun loginWithEmail(email: String, password: String, onResult: (Boolean) -> Unit) {
+        viewModelScope.launch {
+            val success = repository.loginWithEmail(email, password)
+            onResult(success)
+        }
+    }
+
+    fun registerWithEmail(email: String, username: String, displayName: String, password: String, onResult: (Boolean) -> Unit) {
+        viewModelScope.launch {
+            val success = repository.registerWithEmail(email, username, displayName, password)
+            onResult(success)
+        }
+    }
+
+    fun loginWithGoogle(email: String, displayName: String, avatarUrl: String, onResult: (Boolean) -> Unit) {
+        viewModelScope.launch {
+            val success = repository.googleLogin(email, displayName, avatarUrl)
+            onResult(success)
+        }
+    }
+
+    fun logout() {
+        viewModelScope.launch {
+            repository.logout()
+        }
+    }
+
     fun clearNotifications() {
         viewModelScope.launch {
             repository.notificationDao.markAllAsRead()

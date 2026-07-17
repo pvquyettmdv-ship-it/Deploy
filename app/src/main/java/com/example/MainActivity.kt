@@ -64,10 +64,12 @@ fun MainAppContainer(viewModel: SocialViewModel) {
     val currentUser by viewModel.currentUser.collectAsStateWithLifecycle()
 
     var currentRoute by remember { mutableStateOf("feed") }
+    var previousRoute by remember { mutableStateOf("feed") }
     var activeProfileUsername by remember { mutableStateOf<String?>(null) } // Target user to show on ProfileScreen
     var activeChatUsername by remember { mutableStateOf<String?>(null) }
 
     val handleNavigateToProfile: (String) -> Unit = { username ->
+        previousRoute = currentRoute
         activeProfileUsername = username
         currentRoute = "profile"
     }
@@ -231,12 +233,15 @@ fun MainAppContainer(viewModel: SocialViewModel) {
         }
     }
 
-    // Modal navigation drawer wrapper
-    ModalNavigationDrawer(
-        drawerState = drawerState,
-        drawerContent = drawerContent
-    ) {
-        Scaffold(
+    if (currentUser == null) {
+        LoginScreen(viewModel = viewModel)
+    } else {
+        // Modal navigation drawer wrapper
+        ModalNavigationDrawer(
+            drawerState = drawerState,
+            drawerContent = drawerContent
+        ) {
+            Scaffold(
             topBar = {
                 CenterAlignedTopAppBar(
                     title = {
@@ -402,7 +407,10 @@ fun MainAppContainer(viewModel: SocialViewModel) {
                         onNavigateToProfile = handleNavigateToProfile,
                         onNavigateToChat = handleNavigateToChat,
                         onBack = if (activeProfileUsername != null) {
-                            { activeProfileUsername = null }
+                            {
+                                activeProfileUsername = null
+                                currentRoute = previousRoute
+                            }
                         } else null
                     )
                     "ai_chat" -> AIChatScreen(
@@ -419,6 +427,7 @@ fun MainAppContainer(viewModel: SocialViewModel) {
                 }
             }
         }
+    }
     }
 }
 

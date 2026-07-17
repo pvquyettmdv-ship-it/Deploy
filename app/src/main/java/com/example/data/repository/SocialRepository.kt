@@ -47,12 +47,12 @@ class SocialRepository private constructor(context: Context) {
 
     suspend fun initDefaultData() = withContext(Dispatchers.IO) {
         // Check if database already has users to avoid re-seeding
-        val currentUserExists = userDao.getCurrentUser() != null
-        if (currentUserExists) {
+        val defaultUserExists = userDao.getUserByUsername("@q_pv") != null
+        if (defaultUserExists) {
             return@withContext
         }
 
-        // Seed Current User
+        // Seed Current User (default available user in DB, but not logged in initially)
         val me = User(
             username = "@q_pv",
             displayName = "Quyết Phạm",
@@ -60,7 +60,9 @@ class SocialRepository private constructor(context: Context) {
             bio = "Đang lập trình ứng dụng mạng xã hội siêu mượt NetVibe với Jetpack Compose & Gemini 3.1 Pro 🚀",
             followersCount = 1250,
             followingCount = 342,
-            isCurrentUser = true
+            isCurrentUser = false,
+            email = "pvquyet.tmdv@gmail.com",
+            password = "123456"
         )
         userDao.insertUser(me)
 
@@ -309,5 +311,80 @@ class SocialRepository private constructor(context: Context) {
             thinking = "Người dùng đã xóa lịch sử trò chuyện. Tôi cần gửi một tin nhắn chào mừng ngắn gọn để xác nhận và sẵn sàng cho câu hỏi tiếp theo.",
             timestamp = System.currentTimeMillis()
         ))
+    }
+
+    // Authentication methods
+    suspend fun loginWithEmail(email: String, password: String): Boolean = withContext(Dispatchers.IO) {
+        val user = userDao.getUserByEmail(email)
+        if (user != null && user.password == password) {
+            userDao.logoutAllUsers()
+            userDao.updateUser(user.copy(isCurrentUser = true))
+            return@withContext true
+        }
+        return@withContext false
+    }
+
+    suspend fun registerWithEmail(email: String, username: String, displayName: String, password: String): Boolean = withContext(Dispatchers.IO) {
+        val emailExists = userDao.getUserByEmail(email) != null
+        val usernameWithAt = if (username.startsWith("@")) username else "@$username"
+        val usernameExists = userDao.getUserByUsername(usernameWithAt) != null
+        
+        if (emailExists || usernameExists) {
+            return@withContext false
+        }
+        
+        val newUser = User(
+            username = usernameWithAt,
+            displayName = displayName,
+            avatarUrl = "https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=150&q=80",
+            bio = "Thành viên mới của NetVibe ✨",
+            followersCount = 0,
+            followingCount = 0,
+            isFollowing = false,
+            isCurrentUser = true,
+            email = email,
+            password = password
+        )
+        userDao.logoutAllUsers()
+        userDao.insertUser(newUser)
+        return@withContext true
+    }
+
+    suspend fun logout() = withContext(Dispatchers.IO) {
+        userDao.logoutAllUsers()
+    }
+
+    suspend fun googleLogin(email: String, displayName: String, avatarUrl: String): Boolean = withContext(Dispatchers.IO) {
+        val existingUser = userDao.getUserByEmail(email)
+        if (existingUser != null) {
+            userDao.logoutAllUsers()
+            userDao.updateUser(existingUser.copy(isCurrentUser = true))
+            return@withContext true
+        } else {
+            // Register new Google user
+            val usernamePart = email.substringBefore("@").lowercase().replace(Regex("[^a-z0-9_]"), "")
+            var username = "@$usernamePart"
+            var count = 1
+            while (userDao.getUserByUsername(username) != null) {
+                username = "@$usernamePart$count"
+                count++
+            }
+            
+            val newUser = User(
+                username = username,
+                displayName = displayName,
+                avatarUrl = avatarUrl,
+                bio = "Đăng nhập nhanh qua Google Gmail 🌐",
+                followersCount = 0,
+                followingCount = 0,
+                isFollowing = false,
+                isCurrentUser = true,
+                email = email,
+                password = null
+            )
+            userDao.logoutAllUsers()
+            userDao.insertUser(newUser)
+            return@withContext true
+        }
     }
 }

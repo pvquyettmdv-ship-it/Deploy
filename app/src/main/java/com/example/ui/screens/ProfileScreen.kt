@@ -51,6 +51,7 @@ fun ProfileScreen(
     var showEditDialog by remember { mutableStateOf(false) }
     var showCommentDialogForPost by remember { mutableStateOf<Post?>(null) }
     var showFollowListDialog by remember { mutableStateOf<String?>(null) } // "followers" or "following"
+    var activePostMenu by remember { mutableStateOf<Post?>(null) }
 
     // Resolve which user profile to show
     val userProfile = remember(targetUsername, currentUser, otherUsers) {
@@ -156,7 +157,7 @@ fun ProfileScreen(
                             copyToClipboard(context, "https://netvibe.social/post/${post.id}")
                             Toast.makeText(context, "Đã sao chép liên kết chia sẻ!", Toast.LENGTH_SHORT).show()
                         },
-                        onMoreClick = {},
+                        onMoreClick = { activePostMenu = post },
                         onUserClick = {} // Already on their profile
                     )
                     HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.4f))
@@ -198,6 +199,34 @@ fun ProfileScreen(
                     onNavigateToProfile(username)
                 },
                 viewModel = viewModel
+            )
+        }
+
+        // More Post Options Bottom Sheet / Dialog (Report, Block, Hide)
+        activePostMenu?.let { post ->
+            PostOptionsMenu(
+                post = post,
+                onDismiss = { activePostMenu = null },
+                onCopyText = {
+                    copyToClipboard(context, post.content)
+                    Toast.makeText(context, "Đã sao chép nội dung bài viết!", Toast.LENGTH_SHORT).show()
+                    activePostMenu = null
+                },
+                onHide = {
+                    viewModel.hidePost(post.id)
+                    Toast.makeText(context, "Đã ẩn bài viết khỏi bảng tin của bạn.", Toast.LENGTH_SHORT).show()
+                    activePostMenu = null
+                },
+                onBlockUser = {
+                    viewModel.blockUser(post.username)
+                    Toast.makeText(context, "Đã chặn người dùng ${post.username}.", Toast.LENGTH_LONG).show()
+                    activePostMenu = null
+                },
+                onReport = {
+                    viewModel.reportPost(post.id)
+                    Toast.makeText(context, "Đã gửi báo cáo vi phạm nội dung bài viết.", Toast.LENGTH_LONG).show()
+                    activePostMenu = null
+                }
             )
         }
     }
