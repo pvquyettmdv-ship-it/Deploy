@@ -143,9 +143,9 @@ class SocialViewModel(application: Application) : AndroidViewModel(application) 
         blockedUsernames.value = blockedUsernames.value + username
     }
 
-    fun updateProfile(displayName: String, bio: String) {
+    fun updateProfile(displayName: String, bio: String, avatarUrl: String? = null) {
         viewModelScope.launch {
-            repository.updateMyProfile(displayName, bio)
+            repository.updateMyProfile(displayName, bio, avatarUrl)
         }
     }
 
@@ -214,6 +214,10 @@ class SocialViewModel(application: Application) : AndroidViewModel(application) 
             }
             isAiThinking.value = false
         }
+    }
+
+    fun getCommentsByUsername(username: String): Flow<List<Comment>> {
+        return repository.getCommentsByUsername(username)
     }
 
     fun clearAIChat() {

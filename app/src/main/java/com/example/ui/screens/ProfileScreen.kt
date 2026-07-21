@@ -1,10 +1,7 @@
 package com.example.ui.screens
 
-import android.widget.Toast
 import androidx.compose.animation.*
-import androidx.compose.foundation.background
-import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -18,598 +15,498 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.window.Dialog
-import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import coil.compose.AsyncImage
-import com.example.data.local.Post
-import com.example.data.local.User
-import com.example.ui.viewmodel.SocialViewModel
+import com.example.data.Product
+import com.example.ui.MainViewModel
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun ProfileScreen(
-    viewModel: SocialViewModel,
-    targetUsername: String?, // Null indicates current user
-    onNavigateToProfile: (String) -> Unit,
-    onNavigateToChat: (String) -> Unit,
-    onBack: (() -> Unit)? = null,
-    modifier: Modifier = Modifier
-) {
-    val context = LocalContext.current
-    val currentUser by viewModel.currentUser.collectAsStateWithLifecycle()
-    val otherUsers by viewModel.otherUsers.collectAsStateWithLifecycle()
-    val allPosts by viewModel.allPosts.collectAsStateWithLifecycle()
+fun ProfileScreen(viewModel: MainViewModel) {
+    val products by viewModel.allProducts.collectAsState()
 
-    var showEditDialog by remember { mutableStateOf(false) }
-    var showCommentDialogForPost by remember { mutableStateOf<Post?>(null) }
-    var showFollowListDialog by remember { mutableStateOf<String?>(null) } // "followers" or "following"
-    var activePostMenu by remember { mutableStateOf<Post?>(null) }
+    var isSellerMode by remember { mutableStateOf(false) } // Switches between Creator and Seller Center
 
-    // Resolve which user profile to show
-    val userProfile = remember(targetUsername, currentUser, otherUsers) {
-        if (targetUsername == null || targetUsername == currentUser?.username) {
-            currentUser
-        } else {
-            otherUsers.find { it.username == targetUsername }
-        }
-    }
-
-    // Filter posts for this user
-    val userPosts = remember(allPosts, userProfile) {
-        val username = userProfile?.username ?: ""
-        allPosts.filter { it.username == username }
-    }
-
-    if (userProfile == null) {
-        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-            CircularProgressIndicator()
-        }
-        return
-    }
-
-    val isMe = userProfile.username == currentUser?.username
-
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text(userProfile.displayName, fontWeight = FontWeight.Bold, fontSize = 18.sp) },
-                navigationIcon = {
-                    if (onBack != null) {
-                        IconButton(onClick = onBack) {
-                            Icon(Icons.Default.ArrowBack, contentDescription = "Quay lại")
-                        }
-                    }
-                }
-            )
-        },
-        modifier = modifier
-    ) { innerPadding ->
-        LazyColumn(
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .statusBarsPadding()
+            .verticalScroll(rememberScrollState())
+    ) {
+        // Upper Profile Header
+        Row(
             modifier = Modifier
-                .fillMaxSize()
-                .padding(innerPadding)
+                .fillMaxWidth()
+                .padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
         ) {
-            // Profile Header Card (Tiêu đề hồ sơ)
-            item {
-                ProfileHeaderSection(
-                    user = userProfile,
-                    isMe = isMe,
-                    postsCount = userPosts.size,
-                    onEditProfileClick = { showEditDialog = true },
-                    onFollowToggle = { viewModel.toggleFollowUser(userProfile.username) },
-                    onShowFollowers = { showFollowListDialog = "followers" },
-                    onShowFollowing = { showFollowListDialog = "following" },
-                    onNavigateToChat = onNavigateToChat
+            Text(
+                text = if (isSellerMode) "Kênh người bán VibeCart" else "Hồ sơ của tôi",
+                fontWeight = FontWeight.Bold,
+                fontSize = 20.sp,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+
+            // Dynamic Mode switcher
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier
+                    .clip(RoundedCornerShape(20.dp))
+                    .background(MaterialTheme.colorScheme.primaryContainer)
+                    .clickable { isSellerMode = !isSellerMode }
+                    .padding(horizontal = 12.dp, vertical = 6.dp)
+                    .testTag("switch_seller_mode")
+            ) {
+                Icon(
+                    imageVector = if (isSellerMode) Icons.Filled.Storefront else Icons.Filled.Person,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(16.dp)
+                )
+                Spacer(modifier = Modifier.width(6.dp))
+                Text(
+                    text = if (isSellerMode) "Seller Mode" else "Creator Mode",
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.primary
                 )
             }
-
-            // Divider and Title
-            item {
-                Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp)) {
-                    Text(
-                        text = "Bài đăng của ${userProfile.displayName}",
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 15.sp,
-                        color = MaterialTheme.colorScheme.primary
-                    )
-                    Spacer(modifier = Modifier.height(4.dp))
-                    HorizontalDivider(color = MaterialTheme.colorScheme.primary, thickness = 2.dp, modifier = Modifier.width(60.dp))
-                }
-            }
-
-            // Feed of User's Posts
-            if (userPosts.isEmpty()) {
-                item {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(vertical = 48.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(
-                            text = "Chưa có bài đăng nào từ người dùng này.",
-                            fontSize = 14.sp,
-                            color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.5f)
-                        )
-                    }
-                }
-            } else {
-                items(userPosts, key = { it.id }) { post ->
-                    val isInteractionAllowed = post.privacy == "public" || 
-                                               post.username == currentUser?.username || 
-                                               otherUsers.any { it.username == post.username && it.isFollowing }
-
-                    PostCard(
-                        post = post,
-                        isInteractionAllowed = isInteractionAllowed,
-                        onLikeClick = { viewModel.toggleLike(post.id) },
-                        onCommentClick = { showCommentDialogForPost = post },
-                        onRepostClick = { viewModel.repostPost(post.id) },
-                        onShareClick = {
-                            copyToClipboard(context, "https://netvibe.social/post/${post.id}")
-                            Toast.makeText(context, "Đã sao chép liên kết chia sẻ!", Toast.LENGTH_SHORT).show()
-                        },
-                        onMoreClick = { activePostMenu = post },
-                        onUserClick = {} // Already on their profile
-                    )
-                    HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.4f))
-                }
-            }
         }
 
-        // Edit Profile Dialog
-        if (showEditDialog) {
-            EditProfileDialog(
-                user = userProfile,
-                onDismiss = { showEditDialog = false },
-                onSave = { name, bio ->
-                    viewModel.updateProfile(name, bio)
-                    showEditDialog = false
-                    Toast.makeText(context, "Cập nhật hồ sơ cá nhân thành công!", Toast.LENGTH_SHORT).show()
-                }
-            )
-        }
+        Divider(color = MaterialTheme.colorScheme.outlineVariant)
 
-        // Comment Sheet Popup
-        showCommentDialogForPost?.let { post ->
-            CommentDialog(
-                post = post,
-                viewModel = viewModel,
-                onDismiss = { showCommentDialogForPost = null }
-            )
-        }
-
-        // Followers / Following dialog
-        showFollowListDialog?.let { type ->
-            FollowersListDialog(
-                type = type,
-                currentUser = currentUser,
-                otherUsers = otherUsers,
-                onDismiss = { showFollowListDialog = null },
-                onNavigateToProfile = { username ->
-                    showFollowListDialog = null
-                    onNavigateToProfile(username)
-                },
-                viewModel = viewModel
-            )
-        }
-
-        // More Post Options Bottom Sheet / Dialog (Report, Block, Hide)
-        activePostMenu?.let { post ->
-            PostOptionsMenu(
-                post = post,
-                onDismiss = { activePostMenu = null },
-                onCopyText = {
-                    copyToClipboard(context, post.content)
-                    Toast.makeText(context, "Đã sao chép nội dung bài viết!", Toast.LENGTH_SHORT).show()
-                    activePostMenu = null
-                },
-                onHide = {
-                    viewModel.hidePost(post.id)
-                    Toast.makeText(context, "Đã ẩn bài viết khỏi bảng tin của bạn.", Toast.LENGTH_SHORT).show()
-                    activePostMenu = null
-                },
-                onBlockUser = {
-                    viewModel.blockUser(post.username)
-                    Toast.makeText(context, "Đã chặn người dùng ${post.username}.", Toast.LENGTH_LONG).show()
-                    activePostMenu = null
-                },
-                onReport = {
-                    viewModel.reportPost(post.id)
-                    Toast.makeText(context, "Đã gửi báo cáo vi phạm nội dung bài viết.", Toast.LENGTH_LONG).show()
-                    activePostMenu = null
-                }
-            )
+        if (!isSellerMode) {
+            CreatorProfileView(viewModel)
+        } else {
+            SellerCenterView(viewModel, products)
         }
     }
 }
 
 @Composable
-fun ProfileHeaderSection(
-    user: User,
-    isMe: Boolean,
-    postsCount: Int,
-    onEditProfileClick: () -> Unit,
-    onFollowToggle: () -> Unit,
-    onShowFollowers: () -> Unit,
-    onShowFollowing: () -> Unit,
-    onNavigateToChat: (String) -> Unit
-) {
-    Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(16.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)),
-        shape = RoundedCornerShape(20.dp)
-    ) {
-        Column {
-            // Visual decorative banner gradient background
+fun CreatorProfileView(viewModel: MainViewModel) {
+    val posts by viewModel.allPosts.collectAsState()
+
+    Column(modifier = Modifier.fillMaxWidth()) {
+        // Cover Photo & Avatar
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(140.dp)
+                .drawBehind {
+                    drawRect(
+                        brush = Brush.horizontalGradient(
+                            colors = listOf(Color(0xFFC9D6FF), Color(0xFFE2E2E2))
+                        )
+                    )
+                }
+        ) {
             Box(
                 modifier = Modifier
-                    .fillMaxWidth()
-                    .height(90.dp)
-                    .background(
-                        Brush.linearGradient(
-                            colors = listOf(
-                                MaterialTheme.colorScheme.primary,
-                                MaterialTheme.colorScheme.tertiary
-                            )
-                        )
-                    )
-            )
-
-            // Profile info area (Avatar overlaps banner)
-            Column(
-                modifier = Modifier
-                    .padding(horizontal = 16.dp, vertical = 12.dp)
-                    .fillMaxWidth()
+                    .align(Alignment.BottomStart)
+                    .padding(start = 16.dp, bottom = 12.dp)
+                    .size(64.dp)
+                    .clip(CircleShape)
+                    .border(2.dp, Color.White, CircleShape)
+                    .background(Color.Gray),
+                contentAlignment = Alignment.Center
             ) {
+                Text(text = "C", color = Color.White, fontWeight = FontWeight.ExtraBold, fontSize = 24.sp)
+            }
+        }
+
+        // Details
+        Column(modifier = Modifier.padding(16.dp)) {
+            Text(text = "Chanh Beauty 🌸", fontWeight = FontWeight.Bold, fontSize = 18.sp)
+            Text(text = "Social Commerce Creator. Chuyên gia review mỹ phẩm, skincare và xu hướng thời trang dạo phố.", color = Color.Gray, fontSize = 12.sp)
+            Spacer(modifier = Modifier.height(12.dp))
+            
+            // Stats grid
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                ProfileStatBlock(num = "24K", label = "Theo dõi")
+                ProfileStatBlock(num = "450K", label = "Lượt thích")
+                ProfileStatBlock(num = "15%", label = "HH trung bình")
+                ProfileStatBlock(num = "4.9★", label = "Đánh giá")
+            }
+        }
+
+        Divider(modifier = Modifier.padding(vertical = 8.dp), color = MaterialTheme.colorScheme.outlineVariant)
+
+        // KOL Affiliate Dashboard overview
+        Card(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            shape = RoundedCornerShape(16.dp),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.2f))
+        ) {
+            Column(modifier = Modifier.padding(16.dp)) {
+                Text(text = "Chương trình KOL Affiliate 💰", fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                Spacer(modifier = Modifier.height(8.dp))
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.Bottom
+                    horizontalArrangement = Arrangement.SpaceBetween
                 ) {
-                    // Overlapping Avatar
-                    AsyncImage(
-                        model = user.avatarUrl,
-                        contentDescription = null,
-                        modifier = Modifier
-                            .size(76.dp)
-                            .offset(y = (-38).dp)
-                            .clip(CircleShape)
-                            .border(4.dp, MaterialTheme.colorScheme.surface, CircleShape),
-                        contentScale = ContentScale.Crop
-                    )
+                    Column {
+                        Text(text = "Hoa hồng đã tích lũy", fontSize = 11.sp, color = Color.Gray)
+                        Text(text = "2,450,000đ", fontWeight = FontWeight.Bold, fontSize = 18.sp, color = MaterialTheme.colorScheme.primary)
+                    }
+                    Column {
+                        Text(text = "Số đơn giới thiệu", fontSize = 11.sp, color = Color.Gray)
+                        Text(text = "142 đơn", fontWeight = FontWeight.Bold, fontSize = 18.sp, color = MaterialTheme.colorScheme.primary)
+                    }
+                }
+            }
+        }
 
-                    // Profile CTA button
-                    if (isMe) {
-                        Button(
-                            onClick = onEditProfileClick,
-                            shape = RoundedCornerShape(16.dp),
-                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
+        // Creator posts portfolio header
+        Text(
+            text = "Bài đăng của tôi (${posts.size})",
+            fontWeight = FontWeight.Bold,
+            fontSize = 14.sp,
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+        )
+
+        // Show posts portfolio
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 12.dp)
+        ) {
+            posts.chunked(2).forEach { rowItems ->
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    rowItems.forEach { post ->
+                        Card(
                             modifier = Modifier
-                                .height(32.dp)
-                                .testTag("edit_profile_dialog_trigger"),
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = MaterialTheme.colorScheme.primary,
-                                contentColor = MaterialTheme.colorScheme.onPrimary
-                            )
+                                .weight(1f)
+                                .height(160.dp)
+                                .padding(vertical = 4.dp),
+                            shape = RoundedCornerShape(12.dp)
                         ) {
-                            Icon(Icons.Default.Edit, contentDescription = null, modifier = Modifier.size(13.dp))
-                            Spacer(modifier = Modifier.width(4.dp))
-                            Text("Chỉnh sửa hồ sơ", fontSize = 11.sp, fontWeight = FontWeight.Bold)
-                        }
-                    } else {
-                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            val followBtnText = if (user.isFollowing) "Đang theo dõi" else "Theo dõi"
-                            val followBtnColor = if (user.isFollowing) ButtonDefaults.outlinedButtonColors() else ButtonDefaults.buttonColors()
-                            Button(
-                                onClick = onFollowToggle,
-                                colors = followBtnColor,
-                                shape = RoundedCornerShape(16.dp),
-                                contentPadding = PaddingValues(horizontal = 14.dp, vertical = 6.dp),
+                            Box(
                                 modifier = Modifier
-                                    .height(32.dp)
-                                    .testTag("follow_user_header_btn")
+                                    .fillMaxSize()
+                                    .drawBehind {
+                                        drawRect(
+                                            brush = Brush.verticalGradient(
+                                                colors = listOf(Color(0xFF8E2DE2), Color(0xFF4A00E0))
+                                            )
+                                        )
+                                    }
+                                    .padding(8.dp)
                             ) {
                                 Icon(
-                                    imageVector = if (user.isFollowing) Icons.Default.Check else Icons.Default.PersonAdd,
+                                    imageVector = if (post.postType == "video") Icons.Filled.PlayCircle else Icons.Filled.Photo,
                                     contentDescription = null,
-                                    modifier = Modifier.size(13.dp)
+                                    tint = Color.White.copy(alpha = 0.6f),
+                                    modifier = Modifier
+                                        .size(32.dp)
+                                        .align(Alignment.Center)
                                 )
-                                Spacer(modifier = Modifier.width(4.dp))
-                                Text(followBtnText, fontSize = 11.sp, fontWeight = FontWeight.Bold)
-                            }
-
-                            // Message Button
-                            Button(
-                                onClick = { onNavigateToChat(user.username) },
-                                colors = ButtonDefaults.buttonColors(
-                                    containerColor = MaterialTheme.colorScheme.secondaryContainer,
-                                    contentColor = MaterialTheme.colorScheme.onSecondaryContainer
-                                ),
-                                shape = RoundedCornerShape(16.dp),
-                                contentPadding = PaddingValues(horizontal = 14.dp, vertical = 6.dp),
-                                modifier = Modifier
-                                    .height(32.dp)
-                                    .testTag("message_user_header_btn")
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.Forum,
-                                    contentDescription = null,
-                                    modifier = Modifier.size(13.dp)
+                                Text(
+                                    text = post.caption,
+                                    color = Color.White,
+                                    fontSize = 11.sp,
+                                    maxLines = 2,
+                                    overflow = TextOverflow.Ellipsis,
+                                    modifier = Modifier.align(Alignment.BottomStart)
                                 )
-                                Spacer(modifier = Modifier.width(4.dp))
-                                Text("Nhắn tin", fontSize = 11.sp, fontWeight = FontWeight.Bold)
                             }
                         }
                     }
                 }
+            }
+        }
+    }
+}
 
-                // Profile Name, Username & Bio
-                Column(modifier = Modifier.offset(y = (-16).dp)) {
-                    Text(
-                        text = user.displayName,
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 20.sp,
-                        color = MaterialTheme.colorScheme.onBackground
+@Composable
+fun ProfileStatBlock(num: String, label: String) {
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        Text(text = num, fontWeight = FontWeight.ExtraBold, fontSize = 16.sp, color = MaterialTheme.colorScheme.onSurface)
+        Text(text = label, fontSize = 11.sp, color = Color.Gray)
+    }
+}
+
+@Composable
+fun SellerCenterView(viewModel: MainViewModel, products: List<Product>) {
+    val ordersCount by viewModel.merchantOrdersCount.collectAsState()
+    val totalRevenue by viewModel.merchantSales.collectAsState()
+    val followersCount by viewModel.merchantFollowers.collectAsState()
+    val convRate by viewModel.merchantConversionRate.collectAsState()
+    val aiLoading by viewModel.aiLoading.collectAsState()
+
+    var showAddProductDialog by remember { mutableStateOf(false) }
+    var newProdName by remember { mutableStateOf("") }
+    var newProdCat by remember { mutableStateOf("Fashion") }
+    var newProdPrice by remember { mutableStateOf("") }
+    var newProdDesc by remember { mutableStateOf("") }
+
+    Column(modifier = Modifier.padding(16.dp)) {
+        // Merchant Metrics Title
+        Text(text = "Chỉ số doanh thu 📊", fontWeight = FontWeight.Bold, fontSize = 14.sp)
+        Spacer(modifier = Modifier.height(12.dp))
+
+        // Metrics KPI cards grid
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            KpiCard(title = "Doanh thu", num = "${totalRevenue.toInt()}đ", modifier = Modifier.weight(1f))
+            KpiCard(title = "Đơn hàng", num = "$ordersCount", modifier = Modifier.weight(1f))
+        }
+        Spacer(modifier = Modifier.height(8.dp))
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            KpiCard(title = "Khách hàng", num = "$followersCount L/quan", modifier = Modifier.weight(1f))
+            KpiCard(title = "Tỉ lệ mua", num = "$convRate%", modifier = Modifier.weight(1f))
+        }
+
+        Spacer(modifier = Modifier.height(20.dp))
+
+        // Custom M3 statistics canvas Line chart drawing
+        Text(text = "Biểu đồ tăng trưởng doanh số (7 ngày)", fontWeight = FontWeight.Bold, fontSize = 13.sp)
+        Spacer(modifier = Modifier.height(12.dp))
+        
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(140.dp)
+                .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f), RoundedCornerShape(12.dp))
+                .padding(16.dp)
+        ) {
+            Canvas(modifier = Modifier.fillMaxSize()) {
+                val chartWidth = size.width
+                val chartHeight = size.height
+                val points = listOf(0.1f, 0.3f, 0.25f, 0.6f, 0.45f, 0.8f, 1.0f) // Normalized growth metrics
+                
+                // Draw coordinate reference grid lines
+                drawLine(
+                    color = Color.Gray.copy(alpha = 0.2f),
+                    start = Offset(0f, chartHeight / 2),
+                    end = Offset(chartWidth, chartHeight / 2),
+                    strokeWidth = 1.dp.toPx()
+                )
+                drawLine(
+                    color = Color.Gray.copy(alpha = 0.2f),
+                    start = Offset(0f, chartHeight),
+                    end = Offset(chartWidth, chartHeight),
+                    strokeWidth = 1.dp.toPx()
+                )
+
+                // Build line chart path
+                val path = Path()
+                val stepX = chartWidth / (points.size - 1)
+                
+                points.forEachIndexed { idx, pointVal ->
+                    val x = idx * stepX
+                    val y = chartHeight - (pointVal * chartHeight)
+                    if (idx == 0) {
+                        path.moveTo(x, y)
+                    } else {
+                        path.lineTo(x, y)
+                    }
+                    // Draw node circles
+                    drawCircle(
+                        color = Color(0xFFFF0055),
+                        radius = 4.dp.toPx(),
+                        center = Offset(x, y)
                     )
-                    Text(
-                        text = user.username,
-                        fontSize = 13.sp,
-                        color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f)
+                }
+
+                drawPath(
+                    path = path,
+                    color = Color(0xFFFF0055),
+                    style = Stroke(width = 3.dp.toPx())
+                )
+            }
+        }
+
+        Spacer(modifier = Modifier.height(24.dp))
+
+        // Product Catalog Crud row
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(text = "Quản lý kho hàng sản phẩm", fontWeight = FontWeight.Bold, fontSize = 14.sp)
+            Button(
+                onClick = { showAddProductDialog = true },
+                shape = RoundedCornerShape(8.dp),
+                modifier = Modifier.testTag("btn_seller_add_product")
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Filled.Add, contentDescription = null, modifier = Modifier.size(16.dp))
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text(text = "Thêm sản phẩm", fontSize = 11.sp)
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.height(12.dp))
+
+        // Local shop products list
+        products.forEach { prod ->
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 6.dp)
+                    .clip(RoundedCornerShape(8.dp))
+                    .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.2f))
+                    .padding(10.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(text = prod.name, fontWeight = FontWeight.Bold, fontSize = 13.sp, maxLines = 1)
+                    Text(text = "Tồn kho: ${prod.stock} • Danh mục: ${prod.category}", color = Color.Gray, fontSize = 11.sp)
+                }
+                Text(text = "${prod.price.toInt()}đ", color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+            }
+        }
+    }
+
+    // Add Product Dialog Form
+    if (showAddProductDialog) {
+        val isPriceValid = newProdPrice.toDoubleOrNull() != null && (newProdPrice.toDoubleOrNull() ?: 0.0) > 0.0
+        val isNameValid = newProdName.isNotBlank()
+        AlertDialog(
+            onDismissRequest = { showAddProductDialog = false },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        val priceVal = newProdPrice.toDoubleOrNull() ?: 0.0
+                        viewModel.addProductBySeller(
+                            newProdName,
+                            newProdCat,
+                            priceVal,
+                            priceVal * 1.3,
+                            newProdDesc
+                        )
+                        showAddProductDialog = false
+                        // Reset
+                        newProdName = ""
+                        newProdPrice = ""
+                        newProdDesc = ""
+                    },
+                    enabled = isNameValid && isPriceValid,
+                    modifier = Modifier.testTag("btn_seller_submit_add")
+                ) {
+                    Text("Lưu sản phẩm")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showAddProductDialog = false }) {
+                    Text("Hủy")
+                }
+            },
+            title = { Text("Đăng bán sản phẩm mới") },
+            text = {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .verticalScroll(rememberScrollState()),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    val isNameBlank = newProdName.isBlank()
+                    OutlinedTextField(
+                        value = newProdName,
+                        onValueChange = { newProdName = it },
+                        label = { Text("Tên sản phẩm") },
+                        isError = isNameBlank,
+                        supportingText = {
+                            if (isNameBlank) {
+                                Text("Tên sản phẩm không được để trống", color = MaterialTheme.colorScheme.error, fontSize = 11.sp)
+                            }
+                        },
+                        modifier = Modifier.fillMaxWidth().testTag("input_seller_prod_name")
                     )
 
-                    Spacer(modifier = Modifier.height(8.dp))
-
-                    Text(
-                        text = user.bio,
-                        fontSize = 14.sp,
-                        lineHeight = 18.sp,
-                        color = MaterialTheme.colorScheme.onBackground
+                    val isPriceInvalid = newProdPrice.toDoubleOrNull() == null || (newProdPrice.toDoubleOrNull() ?: 0.0) <= 0.0
+                    OutlinedTextField(
+                        value = newProdPrice,
+                        onValueChange = { newProdPrice = it },
+                        label = { Text("Giá bán (VND)") },
+                        isError = isPriceInvalid,
+                        supportingText = {
+                            if (isPriceInvalid) {
+                                Text("Giá bán phải là số lớn hơn 0", color = MaterialTheme.colorScheme.error, fontSize = 11.sp)
+                            }
+                        },
+                        modifier = Modifier.fillMaxWidth().testTag("input_seller_prod_price")
                     )
 
-                    Spacer(modifier = Modifier.height(14.dp))
-
-                    // Social counters (Followers, Following, Posts)
+                    // AI Description helper trigger
                     Row(
                         modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(20.dp)
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Column {
-                            Text(
-                                text = postsCount.toString(),
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 15.sp,
-                                color = MaterialTheme.colorScheme.onBackground
-                            )
-                            Text(
-                                text = "Bài viết",
-                                fontSize = 11.sp,
-                                color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.5f)
-                            )
-                        }
-
-                        Column(modifier = Modifier.clickable { onShowFollowing() }) {
-                            Text(
-                                text = formatNumber(user.followingCount),
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 15.sp,
-                                color = MaterialTheme.colorScheme.onBackground
-                            )
-                            Text(
-                                text = "Đang theo dõi",
-                                fontSize = 11.sp,
-                                color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.5f)
-                            )
-                        }
-
-                        Column(modifier = Modifier.clickable { onShowFollowers() }) {
-                            Text(
-                                text = formatNumber(user.followersCount),
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 15.sp,
-                                color = MaterialTheme.colorScheme.onBackground
-                            )
-                            Text(
-                                text = "Người theo dõi",
-                                fontSize = 11.sp,
-                                color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.5f)
-                            )
+                        Text(text = "Mô tả sản phẩm", fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                        TextButton(
+                            onClick = {
+                                if (newProdName.isNotBlank()) {
+                                    viewModel.generateProductDescription(newProdName) { desc ->
+                                        newProdDesc = desc
+                                    }
+                                }
+                            },
+                            modifier = Modifier.testTag("btn_seller_ai_desc")
+                        ) {
+                            Icon(Icons.Filled.AutoAwesome, contentDescription = null, modifier = Modifier.size(14.dp))
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text(text = "Tạo mô tả AI ✨", fontSize = 11.sp)
                         }
                     }
-                }
-            }
-        }
-    }
-}
 
-@Composable
-fun EditProfileDialog(
-    user: User,
-    onDismiss: () -> Unit,
-    onSave: (displayName: String, bio: String) -> Unit
-) {
-    var displayNameInput by remember { mutableStateOf(user.displayName) }
-    var bioInput by remember { mutableStateOf(user.bio) }
-
-    Dialog(onDismissRequest = onDismiss) {
-        Surface(
-            modifier = Modifier
-                .fillMaxWidth(0.9f)
-                .wrapContentHeight(),
-            shape = RoundedCornerShape(16.dp),
-            color = MaterialTheme.colorScheme.surface,
-            tonalElevation = 6.dp
-        ) {
-            Column(
-                modifier = Modifier
-                    .padding(20.dp)
-                    .fillMaxWidth()
-            ) {
-                Text(
-                    text = "Chỉnh sửa hồ sơ",
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 18.sp,
-                    modifier = Modifier.padding(bottom = 16.dp)
-                )
-
-                OutlinedTextField(
-                    value = displayNameInput,
-                    onValueChange = { displayNameInput = it },
-                    label = { Text("Họ và Tên") },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(bottom = 12.dp)
-                        .testTag("edit_display_name_input"),
-                    singleLine = true
-                )
-
-                OutlinedTextField(
-                    value = bioInput,
-                    onValueChange = { bioInput = it },
-                    label = { Text("Tiểu sử") },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(bottom = 20.dp)
-                        .testTag("edit_bio_input"),
-                    maxLines = 4
-                )
-
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.End
-                ) {
-                    TextButton(onClick = onDismiss) {
-                        Text("Hủy")
+                    if (aiLoading) {
+                        LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
                     }
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Button(
-                        onClick = { onSave(displayNameInput, bioInput) },
-                        enabled = displayNameInput.isNotBlank(),
-                        modifier = Modifier.testTag("save_profile_button")
-                    ) {
-                        Text("Lưu hồ sơ")
-                    }
-                }
-            }
-        }
-    }
-}
 
-@Composable
-fun FollowersListDialog(
-    type: String, // "followers" or "following"
-    currentUser: User?,
-    otherUsers: List<User>,
-    onDismiss: () -> Unit,
-    onNavigateToProfile: (String) -> Unit,
-    viewModel: SocialViewModel
-) {
-    val usersList = remember(type, otherUsers) {
-        if (type == "following") {
-            otherUsers.filter { it.isFollowing }
-        } else {
-            // Simulated followers: anyone who isn't current user can be followers for prototyping,
-            // let's show all other users as mock followers
-            otherUsers.filter { it.username != "@tech_guru" }
-        }
-    }
-
-    Dialog(onDismissRequest = onDismiss) {
-        Surface(
-            modifier = Modifier
-                .fillMaxWidth(0.9f)
-                .fillMaxHeight(0.7f),
-            shape = RoundedCornerShape(16.dp),
-            color = MaterialTheme.colorScheme.surface,
-            tonalElevation = 6.dp
-        ) {
-            Column(modifier = Modifier.fillMaxSize()) {
-                // Header
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(16.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(
-                        text = if (type == "followers") "Người theo dõi" else "Đang theo dõi",
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 16.sp
+                    OutlinedTextField(
+                        value = newProdDesc,
+                        onValueChange = { newProdDesc = it },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(110.dp),
+                        maxLines = 4
                     )
-                    IconButton(onClick = onDismiss) {
-                        Icon(Icons.Default.Close, contentDescription = "Đóng")
-                    }
                 }
+            },
+            shape = RoundedCornerShape(20.dp)
+        )
+    }
+}
 
-                HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.5f))
-
-                if (usersList.isEmpty()) {
-                    Box(modifier = Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
-                        Text(
-                            text = "Danh sách đang trống.",
-                            fontSize = 14.sp,
-                            color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.5f)
-                        )
-                    }
-                } else {
-                    LazyColumn(modifier = Modifier.weight(1f).fillMaxWidth()) {
-                        items(usersList) { user ->
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .clickable { onNavigateToProfile(user.username) }
-                                    .padding(horizontal = 16.dp, vertical = 10.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                AsyncImage(
-                                    model = user.avatarUrl,
-                                    contentDescription = null,
-                                    modifier = Modifier
-                                        .size(38.dp)
-                                        .clip(CircleShape)
-                                )
-                                Spacer(modifier = Modifier.width(10.dp))
-                                Column(modifier = Modifier.weight(1f)) {
-                                    Text(
-                                        text = user.displayName,
-                                        fontWeight = FontWeight.Bold,
-                                        fontSize = 13.sp
-                                    )
-                                    Text(
-                                        text = user.username,
-                                        fontSize = 11.sp,
-                                        color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.5f)
-                                    )
-                                }
-                                
-                                // Quick Follow Action button on row
-                                TextButton(
-                                    onClick = { viewModel.toggleFollowUser(user.username) },
-                                    modifier = Modifier.height(30.dp)
-                                ) {
-                                    Text(
-                                        text = if (user.isFollowing) "Bỏ theo dõi" else "Theo dõi",
-                                        fontSize = 11.sp,
-                                        fontWeight = FontWeight.Bold
-                                    )
-                                }
-                            }
-                            HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.2f))
-                        }
-                    }
-                }
-            }
+@Composable
+fun KpiCard(title: String, num: String, modifier: Modifier = Modifier) {
+    Card(
+        modifier = modifier,
+        shape = RoundedCornerShape(12.dp)
+    ) {
+        Column(modifier = Modifier.padding(12.dp)) {
+            Text(text = title, fontSize = 11.sp, color = Color.Gray)
+            Spacer(modifier = Modifier.height(4.dp))
+            Text(text = num, fontWeight = FontWeight.Bold, fontSize = 15.sp)
         }
     }
 }

@@ -71,6 +71,9 @@ interface CommentDao {
     @Query("SELECT * FROM comments WHERE postId = :postId ORDER BY timestamp ASC")
     fun getCommentsForPost(postId: Int): Flow<List<Comment>>
 
+    @Query("SELECT * FROM comments WHERE username = :username ORDER BY timestamp DESC")
+    fun getCommentsByUsername(username: String): Flow<List<Comment>>
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertComment(comment: Comment)
 }

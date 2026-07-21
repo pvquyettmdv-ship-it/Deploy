@@ -1,6 +1,6 @@
 {
-  "name": "NetVibe",
-  "description": "Mạng xã hội đa tính năng tích hợp trợ lý AI suy nghĩ sâu (Thinking Assistant)",
+  "name": "VibeCart",
+  "description": "Nền tảng Web Social Commerce hiện đại - Trải nghiệm TikTok Shop + RED + Shopee + Instagram",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }

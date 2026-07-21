@@ -22,6 +22,6 @@ dependencyResolutionManagement {
   }
 }
 
-rootProject.name = "NetVibe"
+rootProject.name = "VibeCart"
 
 include(":app")

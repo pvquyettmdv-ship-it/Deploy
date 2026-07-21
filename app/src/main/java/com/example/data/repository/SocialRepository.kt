@@ -288,9 +288,17 @@ class SocialRepository private constructor(context: Context) {
         postDao.insertPost(post)
     }
 
-    suspend fun updateMyProfile(displayName: String, bio: String) = withContext(Dispatchers.IO) {
+    suspend fun updateMyProfile(displayName: String, bio: String, avatarUrl: String? = null) = withContext(Dispatchers.IO) {
         val me = userDao.getCurrentUser() ?: return@withContext
-        userDao.updateUser(me.copy(displayName = displayName, bio = bio))
+        userDao.updateUser(me.copy(
+            displayName = displayName,
+            bio = bio,
+            avatarUrl = if (!avatarUrl.isNullOrBlank()) avatarUrl else me.avatarUrl
+        ))
+    }
+
+    fun getCommentsByUsername(username: String): Flow<List<Comment>> {
+        return commentDao.getCommentsByUsername(username)
     }
 
     suspend fun addAIChatMessage(text: String, thinking: String?, sender: String) = withContext(Dispatchers.IO) {
